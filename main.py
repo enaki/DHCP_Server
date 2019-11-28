@@ -31,19 +31,21 @@ def test_Decoder():
     print(Decoder.str(mac))
 
 def Main():
-    server = DHCP_Server()
+    dhcp_server = DHCP_Server()
+    dhcp_server.start_server()
     #start_gui()
     #sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     #test_Encoder()
     #test_Decoder()
     #plg = DHCP_PACKET()
-    p = DHCP_PACKET(None)
-    print(p)
-    data = p.encode()
-    print(data)
-    p2 = DHCP_PACKET(data)
-    print(p2)
+    #p = DHCP_PACKET(None)
+    #print(p)
+    #data = p.encode()
+    #print(data)
+    #p2 = DHCP_PACKET(data)
+    #print(p2)
     #print(plg.encode())
+
 
 if __name__ == '__main__':
     Main()

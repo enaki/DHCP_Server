@@ -1,5 +1,5 @@
 import socket
-from enum import Enum
+from enum import IntEnum
 
 
 class Encoder:
@@ -53,7 +53,8 @@ class Decoder:
         return mac
 
 
-class DHCP_Packet_Type(Enum):
+class DHCP_Packet_Type(IntEnum):
+    NONE = 0
     DHCP_DISCOVER = 1
     DHCP_OFFER = 2
     DHCP_REQEUST = 3
@@ -91,7 +92,7 @@ class DHCP_PACKET:
             self._default_init()
 
     def with_data(self, data: bytearray):
-        self.message_type = Decoder.int(data[0:1])
+        self.message_type = DHCP_Packet_Type(Decoder.int(data[0:1]))
         self.hardware_type = Decoder.int(data[1:2])
         self.hardware_address_length = Decoder.int(data[2:3])
         self.hops = Decoder.int(data[3:4])
@@ -108,7 +109,7 @@ class DHCP_PACKET:
         self.options = Decoder.int(data[236:240])
 
     def _default_init(self):
-        self.message_type = 0
+        self.message_type : DHCP_Packet_Type = DHCP_Packet_Type(0)
         self.hardware_type = 1
         self.hardware_address_length = 6
         self.hops = 0
@@ -139,18 +140,11 @@ class DHCP_PACKET:
         return data
 
     def decode(self):
-        data = b''
-        for option in DHCP_Packet_Fields:
-            value = getattr(self, option['name'])
-            length = option['length']
-            function = getattr(Encoder, option['type'])
-            encoded = function(value, option['length'])
-            data += function(value, length)
-        return data
+        pass
 
     def print(self):
         print("------Packet Info-------")
-        print("Message_type : {}".format(self.message_type))
+        print("Message_type : {}".format(self.message_type.name))
         print("Hardware Type : {}".format(self.hardware_type))
         print("Hops : {}".format(self.hops))
         print("Seconds Elapsed : {}".format(self.seconds_elapsed))
@@ -166,7 +160,7 @@ class DHCP_PACKET:
     def __str__(self):
         string = ""
         string += "------Packet Info-------\n"
-        string += "Message_type : {}\n".format(self.message_type)
+        string += "Message_type : {}\n".format(self.message_type.name)
         string += "Hardware Type : {}\n".format(self.hardware_type)
         string += "Hops : {}\n".format(self.hops)
         string += "Seconds Elapsed : {}\n".format(self.seconds_elapsed)
