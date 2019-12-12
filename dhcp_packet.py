@@ -1,5 +1,6 @@
 import socket
 from enum import IntEnum
+from random import randrange
 
 
 class Encoder:
@@ -24,7 +25,7 @@ class Encoder:
     @staticmethod
     def mac(value: str, length: int = 6) -> bytes:
         result = bytes.fromhex(value.replace(':', '').lower())
-        print("{}   ->   {}".format(result, result.__len__()))
+        #print("{}   ->   {}".format(result, result.__len__()))
         return result + (length - result.__len__()) * b'\x00'
 
 
@@ -89,51 +90,22 @@ DHCP_Packet_Fields = [
 
 class DHCP_PACKET:
     def __init__(self, data):
-        if data:
-            self.with_data(data)
-        else:
-            self._default_init()
-
-    def with_data(self, data: bytearray):
-        self.message_type = DHCP_Packet_Type(Decoder.int(data[0:1]))
-        self.hardware_type = Decoder.int(data[1:2])
-        self.hardware_address_length = Decoder.int(data[2:3])
-        self.hops = Decoder.int(data[3:4])
-        self.transaction_id = Decoder.hex(data[4:8])
-        self.seconds_elapsed = Decoder.int(data[8:10])
-        self.boot_flags = Decoder.hex(data[10:12])
-        self.client_ip_address = Decoder.ip(data[12:16])
-        self.your_ip_address = Decoder.ip(data[16:20])
-        self.server_ip_address = Decoder.ip(data[20:24])
-        self.gateway_ip_address = Decoder.ip(data[24:28])
-        self.client_hardware_address = Decoder.mac(data[28:34])
-        self.magic_cookie = Decoder.hex(data[44:48])
-        #self.magic_cookie = 0x63825363
-        self.server_name = Decoder.str(data[48:112])
-        self.boot_filename = Decoder.str(data[112:240])
-        self.options = Decoder.int(data[240:244])
-
-    def _default_init(self):
-        self.message_type : DHCP_Packet_Type = DHCP_Packet_Type(0)
-        self.hardware_type = 1
-        self.hardware_address_length = 6
-        self.hops = 0
-        self.transaction_id = 0x0
-        self.seconds_elapsed = 0
-        self.boot_flags = 0x0
-        #self.client_ip_address = '0.0.0.0'
-        #self.your_ip_address = '0.0.0.0'
-        #self.server_ip_address = '0.0.0.0'
-        #self.gateway_ip_address = '0.0.0.0'
-        self.client_ip_address = '1.2.3.4'
-        self.your_ip_address = '5.6.7.8'
-        self.server_ip_address = '9.10.11.12'
-        self.gateway_ip_address = '1.2.3.4'
-        self.client_hardware_address = '12:34:45:ab:cd:ef'
-        self.magic_cookie = 0x63825363
-        self.server_name = 'dhcp_server'
-        self.boot_filename = ''
-        self.options = 0x0
+        self.message_type = DHCP_Packet_Type(Decoder.int(data[0:1])) if data else DHCP_Packet_Type(0)
+        self.hardware_type = Decoder.int(data[1:2]) if data else 1
+        self.hardware_address_length = Decoder.int(data[2:3]) if data else 6
+        self.hops = Decoder.int(data[3:4]) if data else 0
+        self.transaction_id = Decoder.hex(data[4:8]) if data else randrange(0x1_00_00_00_00)    #generate transaction random number
+        self.seconds_elapsed = Decoder.int(data[8:10]) if data else 0
+        self.boot_flags = Decoder.hex(data[10:12]) if data else 0x0
+        self.client_ip_address = Decoder.ip(data[12:16]) if data else '1.2.3.4' #'0.0.0.0'
+        self.your_ip_address = Decoder.ip(data[16:20]) if data else '5.6.7.8' #'0.0.0.0'
+        self.server_ip_address = Decoder.ip(data[20:24]) if data else '9.10.11.12' #'0.0.0.0'
+        self.gateway_ip_address = Decoder.ip(data[24:28]) if data else '1.2.3.4' #'0.0.0.0'
+        self.client_hardware_address = Decoder.mac(data[28:34]) if data else '12:34:45:ab:cd:ef' #'0.0.0.0'
+        self.magic_cookie = Decoder.hex(data[44:48]) if data else 0x63825363
+        self.server_name = Decoder.str(data[48:112]) if data else 'dhcp_server'
+        self.boot_filename = Decoder.str(data[112:240]) if data else ''
+        self.options = Decoder.int(data[240:244]) if data else 0x0
 
     def encode(self):
         data = b''
@@ -148,29 +120,17 @@ class DHCP_PACKET:
     def decode(self):
         pass
 
-    def print(self):
-        print("------Packet Info-------")
-        print("Message_type : {}".format(self.message_type.name))
-        print("Hardware Type : {}".format(self.hardware_type))
-        print("Hops : {}".format(self.hops))
-        print("Seconds Elapsed : {}".format(self.seconds_elapsed))
-        print("Client Ip Address : {}".format(self.client_ip_address))
-        print("Your Ip Address : {}".format(self.your_ip_address))
-        print("Server Ip Address : {}".format(self.server_ip_address))
-        print("Gateway Ip Address : {}".format(self.gateway_ip_address))
-        print("Client Hardware Address : {}".format(self.client_hardware_address))
-        print("Magic Cookie : {}".format(self.magic_cookie))
-        print("Server Name : {}".format(self.server_name))
-        print("Boot Filename : {}".format(self.boot_filename))
-        print("Options : {}".format(self.options))
-
     def __str__(self):
+        #TO DO hex format working for hex_strings
         string = ""
         string += "------Packet Info-------\n"
         string += "Message_type : {}\n".format(self.message_type.name)
         string += "Hardware Type : {}\n".format(self.hardware_type)
+        string += "Hardware Address Length : 0x{}\n".format(self.hardware_address_length)
         string += "Hops : {}\n".format(self.hops)
+        string += "Transaction Number : {}\n".format(self.transaction_id)
         string += "Seconds Elapsed : {}\n".format(self.seconds_elapsed)
+        string += "Boot Flags : {}\n".format(self.boot_flags)
         string += "Client Ip Address : {}\n".format(self.client_ip_address)
         string += "Your Ip Address : {}\n".format(self.your_ip_address)
         string += "Server Ip Address : {}\n".format(self.server_ip_address)

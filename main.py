@@ -5,12 +5,12 @@ from dhcp_gui import DHCP_Server_GUI
 from dhcp_packet import Encoder, DHCP_PACKET, Decoder
 from dhcp_server import DHCP_Server
 
-
 def start_gui():
     root = tk.Tk()
     root.geometry("800x500")
     app = DHCP_Server_GUI(root)
     root.mainloop()
+
 
 def test_Encoder():
     ip = '10.14.15.16'
@@ -29,6 +29,7 @@ def test_Decoder():
     mac = b'\x34\x01\x02\x03\x45\x67'
     print(Decoder.mac(mac))
     print(Decoder.str(mac))
+
 
 def Main():
     dhcp_server = DHCP_Server()
