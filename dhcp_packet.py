@@ -22,8 +22,10 @@ class Encoder:
         return (length - len(temp)) * b'\x00' + temp
 
     @staticmethod
-    def mac(value: str, length: int = 1) -> bytes:
-        return bytes.fromhex(value.replace(':', '').lower())
+    def mac(value: str, length: int = 6) -> bytes:
+        result = bytes.fromhex(value.replace(':', '').lower())
+        print("{}   ->   {}".format(result, result.__len__()))
+        return result + (length - result.__len__()) * b'\x00'
 
 
 class Decoder:
@@ -78,6 +80,7 @@ DHCP_Packet_Fields = [
     {'id': 'siaddr', 'name': 'server_ip_address', 'length': 4, 'type': 'ip'},
     {'id': 'giaddr', 'name': 'gateway_ip_address', 'length': 4, 'type': 'ip'},
     {'id': 'chaddr', 'name': 'client_hardware_address', 'length': 16, 'type': 'mac'},
+    {'id': 'cookie', 'name': 'magic_cookie', 'length': 4, 'type': 'hex'},
     {'id': 'sname', 'name': 'server_name', 'length': 64, 'type': 'str'},
     {'id': 'filename', 'name': 'boot_filename', 'length': 128, 'type': 'str'},
     {'id': 'options', 'name': 'options', 'length': 4, 'type': 'hex'},
@@ -104,9 +107,11 @@ class DHCP_PACKET:
         self.server_ip_address = Decoder.ip(data[20:24])
         self.gateway_ip_address = Decoder.ip(data[24:28])
         self.client_hardware_address = Decoder.mac(data[28:34])
-        self.server_name = Decoder.str(data[44:108])
-        self.boot_filename = Decoder.str(data[108:236])
-        self.options = Decoder.int(data[236:240])
+        self.magic_cookie = Decoder.hex(data[44:48])
+        #self.magic_cookie = 0x63825363
+        self.server_name = Decoder.str(data[48:112])
+        self.boot_filename = Decoder.str(data[112:240])
+        self.options = Decoder.int(data[240:244])
 
     def _default_init(self):
         self.message_type : DHCP_Packet_Type = DHCP_Packet_Type(0)
@@ -125,6 +130,7 @@ class DHCP_PACKET:
         self.server_ip_address = '9.10.11.12'
         self.gateway_ip_address = '1.2.3.4'
         self.client_hardware_address = '12:34:45:ab:cd:ef'
+        self.magic_cookie = 0x63825363
         self.server_name = 'dhcp_server'
         self.boot_filename = ''
         self.options = 0x0
@@ -153,6 +159,7 @@ class DHCP_PACKET:
         print("Server Ip Address : {}".format(self.server_ip_address))
         print("Gateway Ip Address : {}".format(self.gateway_ip_address))
         print("Client Hardware Address : {}".format(self.client_hardware_address))
+        print("Magic Cookie : {}".format(self.magic_cookie))
         print("Server Name : {}".format(self.server_name))
         print("Boot Filename : {}".format(self.boot_filename))
         print("Options : {}".format(self.options))
@@ -169,6 +176,7 @@ class DHCP_PACKET:
         string += "Server Ip Address : {}\n".format(self.server_ip_address)
         string += "Gateway Ip Address : {}\n".format(self.gateway_ip_address)
         string += "Client Hardware Address : {}\n".format(self.client_hardware_address)
+        string += "Magic Cookie : {}\n".format(self.magic_cookie)
         string += "Server Name : {}\n".format(self.server_name)
         string += "Boot Filename : {}\n".format(self.boot_filename)
         string += "Options : {}\n".format(self.options)
