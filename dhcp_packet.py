@@ -14,13 +14,13 @@ class Encoder:
         return value.to_bytes(length, 'big')
 
     @staticmethod
-    def ip(value: str, length : int = 4) -> bytes:
+    def ip(value: str, length: int = 4) -> bytes:
         return socket.inet_aton(value)
 
     @staticmethod
     def str(value: str, length: int) -> bytes:
         temp = str.encode(value)
-        return (length - len(temp)) * b'\x00' + temp
+        return temp + (length - len(temp)) * b'\x00'
 
     @staticmethod
     def mac(value: str, length: int = 6) -> bytes:
@@ -36,7 +36,8 @@ class Decoder:
 
     @staticmethod
     def hex(value: bytes) -> int:
-        return value.hex()
+        return int.from_bytes(value, byteorder='big', signed=False)
+        #return value.hex()
 
     @staticmethod
     def ip(value: bytes) -> str:
@@ -68,6 +69,7 @@ class DHCP_Packet_Type(IntEnum):
     DHCP_INFORM = 8
 
 
+MAGIC_COOKIE = b'\x63\x82\x53\x63'
 DHCP_Packet_Fields = [
     {'id': 'op', 'name': 'message_type', 'length': 1, 'type': 'int'},
     {'id': 'htype', 'name': 'hardware_type', 'length': 1, 'type': 'int'},
@@ -81,7 +83,6 @@ DHCP_Packet_Fields = [
     {'id': 'siaddr', 'name': 'server_ip_address', 'length': 4, 'type': 'ip'},
     {'id': 'giaddr', 'name': 'gateway_ip_address', 'length': 4, 'type': 'ip'},
     {'id': 'chaddr', 'name': 'client_hardware_address', 'length': 16, 'type': 'mac'},
-    {'id': 'cookie', 'name': 'magic_cookie', 'length': 4, 'type': 'hex'},
     {'id': 'sname', 'name': 'server_name', 'length': 64, 'type': 'str'},
     {'id': 'filename', 'name': 'boot_filename', 'length': 128, 'type': 'str'},
     {'id': 'options', 'name': 'options', 'length': 4, 'type': 'hex'},
@@ -97,15 +98,14 @@ class DHCP_PACKET:
         self.transaction_id = Decoder.hex(data[4:8]) if data else randrange(0x1_00_00_00_00)    #generate transaction random number
         self.seconds_elapsed = Decoder.int(data[8:10]) if data else 0
         self.boot_flags = Decoder.hex(data[10:12]) if data else 0x0
-        self.client_ip_address = Decoder.ip(data[12:16]) if data else '1.2.3.4' #'0.0.0.0'
-        self.your_ip_address = Decoder.ip(data[16:20]) if data else '5.6.7.8' #'0.0.0.0'
-        self.server_ip_address = Decoder.ip(data[20:24]) if data else '9.10.11.12' #'0.0.0.0'
-        self.gateway_ip_address = Decoder.ip(data[24:28]) if data else '1.2.3.4' #'0.0.0.0'
-        self.client_hardware_address = Decoder.mac(data[28:34]) if data else '12:34:45:ab:cd:ef' #'0.0.0.0'
-        self.magic_cookie = Decoder.hex(data[44:48]) if data else 0x63825363
-        self.server_name = Decoder.str(data[48:112]) if data else 'dhcp_server'
-        self.boot_filename = Decoder.str(data[112:240]) if data else ''
-        self.options = Decoder.int(data[240:244]) if data else 0x0
+        self.client_ip_address = Decoder.ip(data[12:16]) if data else '0.0.0.0'     #'1.2.3.4'
+        self.your_ip_address = Decoder.ip(data[16:20]) if data else '0.0.0.0'       #'5.6.7.8'
+        self.server_ip_address = Decoder.ip(data[20:24]) if data else '0.0.0.0'     #'9.10.11.12'
+        self.gateway_ip_address = Decoder.ip(data[24:28]) if data else '0.0.0.0'    #'1.2.3.4'
+        self.client_hardware_address = Decoder.mac(data[28:34]) if data else '12:34:45:ab:cd:ef'
+        self.server_name = Decoder.str(data[44:108]) if data else 'dhcp_server'
+        self.boot_filename = Decoder.str(data[108:236]) if data else ''
+        self.options = Decoder.int(data[236:240]) if data else int.from_bytes(MAGIC_COOKIE, byteorder='big')
 
     def encode(self):
         data = b''
@@ -113,22 +113,17 @@ class DHCP_PACKET:
             value = getattr(self, option['name'])
             length = option['length']
             function = getattr(Encoder, option['type'])
-            encoded = function(value, option['length'])
             data += function(value, length)
         return data
 
-    def decode(self):
-        pass
-
     def __str__(self):
-        #TO DO hex format working for hex_strings
         string = ""
         string += "------Packet Info-------\n"
         string += "Message_type : {}\n".format(self.message_type.name)
         string += "Hardware Type : {}\n".format(self.hardware_type)
         string += "Hardware Address Length : 0x{}\n".format(self.hardware_address_length)
         string += "Hops : {}\n".format(self.hops)
-        string += "Transaction Number : {}\n".format(self.transaction_id)
+        string += "Transaction Number : {}\n".format(hex(self.transaction_id))
         string += "Seconds Elapsed : {}\n".format(self.seconds_elapsed)
         string += "Boot Flags : {}\n".format(self.boot_flags)
         string += "Client Ip Address : {}\n".format(self.client_ip_address)
@@ -136,10 +131,9 @@ class DHCP_PACKET:
         string += "Server Ip Address : {}\n".format(self.server_ip_address)
         string += "Gateway Ip Address : {}\n".format(self.gateway_ip_address)
         string += "Client Hardware Address : {}\n".format(self.client_hardware_address)
-        string += "Magic Cookie : {}\n".format(self.magic_cookie)
         string += "Server Name : {}\n".format(self.server_name)
         string += "Boot Filename : {}\n".format(self.boot_filename)
-        string += "Options : {}\n".format(self.options)
+        string += "Options : {}\n".format(hex(self.options))
         return string
 
 

@@ -1,16 +1,11 @@
-import socket
-import tkinter as tk
-import logging as log
 from dhcp_gui import DHCP_Server_GUI
-from dhcp_packet import Encoder, DHCP_PACKET, Decoder
-from dhcp_server import DHCP_Server
+from dhcp_packet import *
+
 
 def start_gui():
-    root = tk.Tk()
-    root.geometry("800x500")
-    app = DHCP_Server_GUI(root)
-    root.mainloop()
-
+    app = DHCP_Server_GUI()
+    app.geometry("800x600")
+    app.mainloop()
 
 def test_Encoder():
     ip = '10.14.15.16'
@@ -22,7 +17,6 @@ def test_Encoder():
     mac2 = 0x129354
     print(Encoder.hex(mac2, 10))
 
-
 def test_Decoder():
     ip = b'\x12\x34\x56\67'
     print(Decoder.ip(ip))
@@ -31,23 +25,12 @@ def test_Decoder():
     print(Decoder.str(mac))
 
 
-def Main():
-    dhcp_server = DHCP_Server()
-    dhcp_server.start_server()
-    #start_gui()
-    #sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    #test_Encoder()
-    #test_Decoder()
-    #plg = DHCP_PACKET()
-    #p = DHCP_PACKET(None)
-    #print(p)
-    #data = p.encode()
-    #print(data)
-    #p2 = DHCP_PACKET(data)
-    #print(p2)
-    #print(plg.encode())
+def main():
+    #dhcp_server = DHCP_Server()
+    #dhcp_server.start_server()
+    start_gui()
 
 
 if __name__ == '__main__':
-    Main()
+    main()
 
