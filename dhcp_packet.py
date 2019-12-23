@@ -25,7 +25,6 @@ class Encoder:
     @staticmethod
     def mac(value: str, length: int = 6) -> bytes:
         result = bytes.fromhex(value.replace(':', '').lower())
-        #print("{}   ->   {}".format(result, result.__len__()))
         return result + (length - result.__len__()) * b'\x00'
 
 
@@ -37,7 +36,6 @@ class Decoder:
     @staticmethod
     def hex(value: bytes) -> int:
         return int.from_bytes(value, byteorder='big', signed=False)
-        #return value.hex()
 
     @staticmethod
     def ip(value: bytes) -> str:
@@ -103,7 +101,7 @@ class DHCP_PACKET:
         self.server_ip_address = Decoder.ip(data[20:24]) if data else '0.0.0.0'     #'9.10.11.12'
         self.gateway_ip_address = Decoder.ip(data[24:28]) if data else '0.0.0.0'    #'1.2.3.4'
         self.client_hardware_address = Decoder.mac(data[28:34]) if data else '12:34:45:ab:cd:ef'
-        self.server_name = Decoder.str(data[44:108]) if data else 'dhcp_server'
+        self.server_name = Decoder.str(data[44:108]) if data else ''
         self.boot_filename = Decoder.str(data[108:236]) if data else ''
         self.options = Decoder.int(data[236:240]) if data else int.from_bytes(MAGIC_COOKIE, byteorder='big')
 
@@ -135,5 +133,3 @@ class DHCP_PACKET:
         string += "Boot Filename : {}\n".format(self.boot_filename)
         string += "Options : {}\n".format(hex(self.options))
         return string
-
-
