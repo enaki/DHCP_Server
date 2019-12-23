@@ -4,7 +4,7 @@ from dhcp_packet import *
 
 def start_gui():
     app = DHCP_Server_GUI()
-    app.geometry("800x600")
+    app.geometry("1024x768")
     app.mainloop()
 
 def test_Encoder():

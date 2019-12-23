@@ -2,6 +2,8 @@ import logging as log
 import socket
 import sys
 from dhcp_packet import DHCP_PACKET, DHCP_Packet_Type
+import tkinter as tk
+import datetime
 
 FORMAT = '[%(asctime)s] [%(levelname)s] : %(message)s'
 log.basicConfig(stream=sys.stdout, level=log.DEBUG, format=FORMAT)
@@ -12,7 +14,7 @@ MAX_BYTES = 1024
 recv_timeout = 5
 
 class DHCP_Server:
-    def __init__(self):
+    def __init__(self, gui=None):
         self.ip = '0.0.0.0'
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
@@ -25,14 +27,15 @@ class DHCP_Server:
         self.address_pool_mask = None
         self.address_pool_broadcast = None
         self.lease_time = None
-        #self.set_address_pool('10.0.0.1', 10)
+        self.gui = gui
+        self.show_packets_debug = False
 
     def set_address_pool_config(self, ip_address, mask):
         self.address_pool_starting_ip_address = ip_address
         self.address_pool_mask = mask
 
     @staticmethod
-    def _update_ip_splitter(ip_1, ip_2, ip_3, ip_4, inf_limit=0, sup_limit=256):
+    def update_ip_splitter(ip_1, ip_2, ip_3, ip_4, inf_limit=0, sup_limit=256):
         ip_4 += 1
         if ip_4 == sup_limit:
             ip_4 = inf_limit
@@ -57,55 +60,71 @@ class DHCP_Server:
         self.lease_time = value
 
     def set_address_pool(self):
-        self.address_pool = {}
-        number_of_addresses = 2**(32-self.address_pool_mask)-2
-        ip_1, ip_2, ip_3, ip_4 = [int(s) for s in self.address_pool_starting_ip_address.split('.')]
-        ip_1, ip_2, ip_3, ip_4 = self._update_ip_splitter(ip_1, ip_2, ip_3, ip_4)
-        for i in range(number_of_addresses):
-            self.address_pool.update({"{}.{}.{}.{}".format(ip_1, ip_2, ip_3, ip_4): None})
-            ip_1, ip_2, ip_3, ip_4 = self._update_ip_splitter(ip_1, ip_2, ip_3, ip_4)
-        self.address_pool_broadcast = "{}.{}.{}.{}".format(ip_1, ip_2, ip_3, ip_4)
+        self.address_pool, self.address_pool_broadcast = self.calculate_address_pool(self.address_pool_starting_ip_address, self.address_pool_mask)
         print(self.address_pool)
 
+    @staticmethod
+    def calculate_address_pool(starting_ip_address, mask):
+        address_pool = {}
+        number_of_addresses = 2 ** (32 - mask) - 2
+        ip_1, ip_2, ip_3, ip_4 = [int(s) for s in starting_ip_address.split('.')]
+        ip_1, ip_2, ip_3, ip_4 = DHCP_Server.update_ip_splitter(ip_1, ip_2, ip_3, ip_4)
+        for i in range(number_of_addresses):
+            address_pool.update({"{}.{}.{}.{}".format(ip_1, ip_2, ip_3, ip_4): None})
+            ip_1, ip_2, ip_3, ip_4 = DHCP_Server.update_ip_splitter(ip_1, ip_2, ip_3, ip_4)
+        address_pool_broadcast = "{}.{}.{}.{}".format(ip_1, ip_2, ip_3, ip_4)
+        return address_pool, address_pool_broadcast
+
     def _send_offer(self, dhcp_packet):
-        log.info("Sending DHCP_OFFER")
+        self.debug("Sending DHCP_OFFER")
         dhcp_packet.message_type = DHCP_Packet_Type.DHCP_OFFER
         available_address = self.get_free_address()
         if available_address is not None:
             dhcp_packet.your_ip_address = available_address
+
+        self.debug_packet(dhcp_packet)
         message = dhcp_packet.encode()
         self.server_socket.sendto(message, self.dest)
 
     def _send_acknowledge(self, dhcp_packet):
-        log.info("Sending DHCP_ACKNOWLEDGE")
+        self.debug("Sending DHCP_ACKNOWLEDGE")
         dhcp_packet.message_type = DHCP_Packet_Type.DHCP_ACK
         dhcp_packet.client_ip_address = dhcp_packet.your_ip_address
         self.address_pool.update({dhcp_packet.client_ip_address: dhcp_packet.client_hardware_address})
         # self.server_socket.send(dhcp_packet.encode(), self.port)
+        self.debug_packet(dhcp_packet)
+        self.gui.frames["ServerStartPage"].addr_pool_text_widget_fill()
+
         message = dhcp_packet.encode()
         self.server_socket.sendto(message, self.dest)
 
     def _send_nacknowledge(self, dhcp_packet):
-        log.info("Sending DHCP_NEGATIVE_ACKNOWLEDGE")
+        self.debug("Sending DHCP_NEGATIVE_ACKNOWLEDGE")
         dhcp_packet.message_type = DHCP_Packet_Type.DHCP_NAK
+        self.debug_packet(dhcp_packet)
+
         message = dhcp_packet.encode()
         self.server_socket.sendto(message, self.dest)
 
     def _analyze_data(self, data: bytes):
         dhcp_packet = DHCP_PACKET(data)
         print(dhcp_packet)
+
         if dhcp_packet.message_type == DHCP_Packet_Type.DHCP_DISCOVER:
-            log.info("DHCP_DISCOVER received")
+            self.debug("DHCP_DISCOVER received", endLine=True)
+            self.debug_packet(dhcp_packet)
             self._send_offer(dhcp_packet)
         elif dhcp_packet.message_type == DHCP_Packet_Type.DHCP_REQEUST:
-            log.info("DHCP REQUEST received")
-            if self.ip_address_is_free(dhcp_packet.your_ip_address):
+            self.debug("DHCP REQUEST received", endLine=True)
+            self.debug_packet(dhcp_packet)
+
+            if dhcp_packet.your_ip_address in self.address_pool and self.ip_address_is_free(dhcp_packet.your_ip_address) and dhcp_packet.client_hardware_address not in self.address_pool.values():
                 self._send_acknowledge(dhcp_packet)
             else:
                 self._send_nacknowledge(dhcp_packet)
 
     def start_server(self):
-        log.info("DHCP Server with name '{}' has started".format(self.name))
+        self.debug("{} has started".format(self.name))
 
         try:
             self.server_socket.bind(('', server_port))
@@ -116,24 +135,23 @@ class DHCP_Server:
         self.server_is_shut_down = False
 
         while self.running_flag:
-            log.info("DHCP Server with name '{}' is waiting for requests ...".format(self.name))
+            self.debug("{} is waiting for requests ...".format(self.name))
             import select
             ready = select.select([self.server_socket], [], [], recv_timeout)
             if ready[0]:
                 data, address = self.server_socket.recvfrom(MAX_BYTES)
                 print(address)
-                log.info("DHCP Server with name '{}' is analyzing the request".format(self.name))
+                self.debug("{} is analyzing the request".format(self.name))
                 self._analyze_data(data)
         self.server_is_shut_down = True
-        log.info("DHCP Server with name '{}' has stopped".format(self.name))
-
+        self.debug("{} has stopped".format(self.name))
 
     def get_free_address(self):
         print(self.address_pool)
         for ip, mac in self.address_pool.items():
             if mac is None:
                 return ip
-            return None
+        return None
 
     def ip_address_is_free(self, ip):
         if self.address_pool[ip] is None:
@@ -143,3 +161,15 @@ class DHCP_Server:
     def set_flag(self, param):
         self.running_flag = param
 
+    def debug(self, param, endLine = False):
+        if self.gui:
+            datetime_object = datetime.datetime.now()
+            printable = "{} : {}\n".format(datetime_object, param)
+            if endLine:
+                self.gui.frames['ServerStartPage'].server_status_text.insert(tk.END, "\n")
+            self.gui.frames['ServerStartPage'].server_status_text.insert(tk.END, printable)
+        log.info(param)
+
+    def debug_packet(self, packet):
+        if self.gui and self.show_packets_debug:
+            self.gui.frames['ServerStartPage'].server_status_text.insert(tk.END, '\n' + str(packet) + '\n')

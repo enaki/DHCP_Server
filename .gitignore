@@ -5,3 +5,5 @@ server_test.py
 udp_receive.py
 udp_send.py
 test_gui.py
+TextHandler.py
+dhcp_histo.txt
