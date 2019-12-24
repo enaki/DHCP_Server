@@ -24,6 +24,7 @@ class DHCP_Server:
         self.server_is_shut_down = True
         self.name = None
         self.address_pool = {}
+        self.old_mac_ip = {}
         self.address_pool_starting_ip_address = None
         self.address_pool_mask = None
         self.address_pool_broadcast = None
@@ -63,6 +64,8 @@ class DHCP_Server:
 
     def set_address_pool(self):
         self.address_pool, self.address_pool_broadcast = self.calculate_address_pool(self.address_pool_starting_ip_address, self.address_pool_mask)
+        for ip in self.address_pool.keys():
+            self.old_mac_ip.update({ip: None})
         print(self.address_pool)
 
     @staticmethod
@@ -77,13 +80,28 @@ class DHCP_Server:
         address_pool_broadcast = "{}.{}.{}.{}".format(ip_1, ip_2, ip_3, ip_4)
         return address_pool, address_pool_broadcast
 
-    def _send_offer(self, dhcp_packet):
-        self.debug("Sending DHCP_OFFER")
-        dhcp_packet.message_type = DHCP_Message_Type.DHCP_OFFER
-        available_address = self.get_free_address()
-        if available_address is not None:
-            dhcp_packet.your_ip_address = available_address
+    def _get_old_mac_ip(self, mac_to_check):
+        if mac_to_check in self.old_mac_ip.values():
+            for ip, mac in self.old_mac_ip.items():
+                if mac == mac_to_check:
+                    return ip
+        return None
 
+    def _send_offer(self, dhcp_packet):
+        dhcp_packet.message_type = DHCP_Message_Type.DHCP_OFFER
+        old_ip = self._get_old_mac_ip(dhcp_packet.client_hardware_address)
+        if old_ip:
+            self.debug("Offering the old ip of {}".format(dhcp_packet.client_hardware_address))
+            dhcp_packet.your_ip_address = old_ip
+        else:
+            available_address = self.get_free_address()
+            if available_address is not None:
+                dhcp_packet.your_ip_address = available_address
+            else:
+                self.debug("Can't offer any ip.")
+                return
+
+        self.debug("Sending DHCP_OFFER")
         self.debug_packet(dhcp_packet)
         message = dhcp_packet.encode()
         self.server_socket.sendto(message, self.dest)
@@ -93,10 +111,10 @@ class DHCP_Server:
         dhcp_packet.message_type = DHCP_Message_Type.DHCP_ACK
         dhcp_packet.client_ip_address = dhcp_packet.your_ip_address
         self.address_pool.update({dhcp_packet.client_ip_address: {'mac': dhcp_packet.client_hardware_address, 'time': datetime.datetime.now()}})
+        self.old_mac_ip.update({dhcp_packet.client_ip_address: dhcp_packet.client_hardware_address})
         # self.server_socket.send(dhcp_packet.encode(), self.port)
         self.debug_packet(dhcp_packet)
-        self.gui.frames["ServerStartPage"].addr_pool_text_widget_fill()
-        self.gui.frames["ServerConfigurationsPage"].static_ip_combobox.configure(values=[ip for ip, ip_info in self.address_pool.items() if ip_info['mac'] is None])
+        self.gui.update_frames_address_pool()
 
         message = dhcp_packet.encode()
         self.server_socket.sendto(message, self.dest)
@@ -135,17 +153,35 @@ class DHCP_Server:
             self.debug_packet(dhcp_packet)
 
             self._add_packet_options(dhcp_packet)
-            if dhcp_packet.your_ip_address not in self.address_pool:
+            ip_address_to_check = dhcp_packet.your_ip_address
+            if ip_address_to_check not in self.address_pool.keys():
+                self.debug("{} is not in my pool".format(ip_address_to_check), afterEndLine=True)
                 self._send_nacknowledge(dhcp_packet)
-                self.debug("{} is not in my pool".format(dhcp_packet.your_ip_address), afterEndLine=True)
-            elif not self.ip_address_is_free(dhcp_packet.your_ip_address):
-                self._send_nacknowledge(dhcp_packet)
-                self.debug("{} is already taken".format(dhcp_packet.your_ip_address), afterEndLine=True)
-            elif self._mac_holds_an_addrees(dhcp_packet.client_hardware_address):
-                self._send_nacknowledge(dhcp_packet)
-                self.debug("The chaddr {} has already one of my ip address".format(dhcp_packet.client_hardware_address), afterEndLine=True)
+            elif self.ip_address_is_free(ip_address_to_check):
+                if self._mac_holds_an_addrees(dhcp_packet.client_hardware_address):
+                    self.debug("The chaddr {} has already another of my ip address".format(dhcp_packet.client_hardware_address), afterEndLine=True)
+                    self._send_nacknowledge(dhcp_packet)
+                else:
+                    self.debug("The chaddr {} is now owner of the ip address {}".format(dhcp_packet.client_hardware_address, ip_address_to_check), afterEndLine=True)
+                    self._send_acknowledge(dhcp_packet)
             else:
-                self._send_acknowledge(dhcp_packet)
+                if self.address_pool[ip_address_to_check]['mac'] != dhcp_packet.client_hardware_address:
+                    self.debug("The ip address {} is taken by another client".format(ip_address_to_check), afterEndLine=True)
+                    self._send_nacknowledge(dhcp_packet)
+                else:
+                    self.debug("Updating the lease time for mac {}".format(dhcp_packet.client_hardware_address), afterEndLine=True)
+                    self._send_acknowledge(dhcp_packet)
+        elif dhcp_packet.message_type == DHCP_Message_Type.DHCP_DECLINE:
+            self.debug("DHCP DECLINE received", endLine=True)
+            self.debug_packet(dhcp_packet)
+        elif dhcp_packet.message_type == DHCP_Message_Type.DHCP_RELEASE:
+            self.debug("DHCP RELEASE received", endLine=True)
+            self.address_pool.update({dhcp_packet.client_ip_address: {'mac': None, 'time': None}})
+            self.gui.update_frames_address_pool()
+            self.debug_packet(dhcp_packet)
+        elif dhcp_packet.message_type == DHCP_Message_Type.DHCP_INFORM:
+            self.debug("DHCP INFORM received", endLine=True)
+            self.debug_packet(dhcp_packet)
 
     def start_server(self):
         self.debug("{} has started".format(self.name))
@@ -209,7 +245,7 @@ class DHCP_Server:
         if self.gui and self.show_packets_debug:
             self.gui.frames['ServerStartPage'].server_status_text.insert(tk.END, '\n' + str(packet) + '\n')
 
-    def _update_address_pool(self):
+    def _update_address_pool(self, time_sleep=3):
         import time
         while self.running_flag:
             for ip, ip_info in self.address_pool.items():
@@ -218,4 +254,4 @@ class DHCP_Server:
                         self.debug("Lease time of {} for user {} has expired".format(ip, ip_info['mac']), afterEndLine=True)
                         self.address_pool.update({ip: {'mac': None, 'time': None}})
                         self.gui.update_frames_address_pool()
-            time.sleep(3)
+            time.sleep(time_sleep)

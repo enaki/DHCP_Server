@@ -44,8 +44,10 @@ class DHCP_Server_GUI(tk.Tk):
 
     def update_frames_address_pool(self):
         self.frames["ServerStartPage"].addr_pool_text_widget_fill()
-        self.frames["ServerConfigurationsPage"].static_ip_combobox.configure(
+        self.frames["ServerStartPage"].static_ip_combobox.configure(
             values=[ip for ip, ip_info in self.dhcp_server.address_pool.items() if ip_info['mac'] is None])
+        self.frames["ServerStartPage"].release_ip_combobox.configure(
+            values=[ip for ip, ip_info in self.dhcp_server.address_pool.items() if ip_info['mac'] is not None])
 
     def start_server(self):
         self.server_thread = threading.Thread(target=self.dhcp_server.start_server)
@@ -120,28 +122,59 @@ class ServerStartPage(ServerPage):
         self.server_name_label_var = tk.StringVar()
         self.server_name_label_var.set("unknown")
         tk.Label(server_info_label, text="Server Name: ", bg=server_info_label["bg"], fg=txt_color, font=self.controller.text_label).grid(row=0, column=0, sticky='w')
-        tk.Label(server_info_label, textvariable=self.server_name_label_var, bg=server_info_label["bg"], fg=button_fg, font=self.controller.text_label).grid(row=0, column=1, sticky='w')
+        tk.Label(server_info_label, textvariable=self.server_name_label_var, bg=server_info_label["bg"], fg=button_fg, font=self.controller.text_label, width=20).grid(row=0, column=1, sticky='w')
 
         self.lease_time_label_var = tk.StringVar()
         self.lease_time_label_var.set("unknown")
         tk.Label(server_info_label, text="Lease Time: ", bg=server_info_label["bg"], fg=txt_color, font=self.controller.text_label).grid(row=1, column=0, sticky='w')
-        tk.Label(server_info_label, textvariable=self.lease_time_label_var, bg=server_info_label["bg"], fg=button_fg, font=self.controller.text_label).grid(row=1, column=1, sticky='w')
+        tk.Label(server_info_label, textvariable=self.lease_time_label_var, bg=server_info_label["bg"], fg=button_fg, font=self.controller.text_label, width=20).grid(row=1, column=1, sticky='w')
+
         #------Addres pool info
         address_pool_label = tk.LabelFrame(server_info_frame, text="Address Pool", bg=label_bg, fg='yellow', font=self.controller.text_label_title)
         address_pool_label.grid(row=1, column=0, padx=10, pady=10, sticky="w")
         self.ip_address_label_var = tk.StringVar()
         self.ip_address_label_var.set("unknown")
-        tk.Label(address_pool_label, text="IP Address: ", bg=address_pool_label["bg"], fg=txt_color,
+        tk.Label(address_pool_label, text="Network IP Address: ", bg=address_pool_label["bg"], fg=txt_color,
                  font=self.controller.text_label).grid(row=0, column=0, sticky='w')
         tk.Label(address_pool_label, textvariable=self.ip_address_label_var, bg=address_pool_label["bg"], fg=button_fg,
-                 font=self.controller.text_label).grid(row=0, column=1, sticky='w')
+                 font=self.controller.text_label, width=15).grid(row=0, column=1, sticky='w')
 
         self.mask_label_var = tk.StringVar()
         self.mask_label_var.set("unknown")
         tk.Label(address_pool_label, text="Mask: ", bg=address_pool_label["bg"], fg=txt_color,
                  font=self.controller.text_label).grid(row=1, column=0, sticky='w')
         tk.Label(address_pool_label, textvariable=self.mask_label_var, bg=address_pool_label["bg"], fg=button_fg,
-                 font=self.controller.text_label).grid(row=1, column=1, sticky='w')
+                 font=self.controller.text_label, width=15).grid(row=1, column=1, sticky='w')
+
+        # allocate static ip
+        static_ip_alloc_frame = tk.LabelFrame(server_info_frame, text="Static IP Allocation", bg=label_bg, fg=label_txt,
+                                              font=self.controller.text_label_title)
+        static_ip_alloc_frame.grid(row=2, column=0, padx=10, pady=10, sticky="w")
+        tk.Label(static_ip_alloc_frame, text='IP Address', bg=address_pool_label["bg"], fg=txt_color,
+                 font=self.controller.text_label).grid(row=0, column=0)
+        self.static_ip_combobox = ttk.Combobox(static_ip_alloc_frame, width=30, values=[])
+
+        self.static_ip_combobox.grid(row=0, column=1, sticky=tk.W, padx=5, pady=5)
+        tk.Label(static_ip_alloc_frame, text='MAC', bg=address_pool_label["bg"], fg=txt_color,
+                 font=self.controller.text_label).grid(row=1, column=0)
+        self.mac_entry = tk.Entry(static_ip_alloc_frame, width=30)
+        self.mac_entry.grid(row=1, column=1, sticky=tk.W, padx=5, pady=5)
+        tk.Button(static_ip_alloc_frame, text='Set IP Address', bg=button_bg, fg=button_fg,
+                  font=self.controller.button_text_font, command=self.set_static_ip).grid(row=2, padx=5, pady=5,
+                                                                                          columnspan=2)
+
+        # release ip
+        release_ip_frame = tk.LabelFrame(server_info_frame, text="Release IP", bg=label_bg, fg=label_txt,
+                                         font=self.controller.text_label_title)
+        release_ip_frame.grid(row=3, column=0, padx=10, pady=10, sticky="w")
+        tk.Label(release_ip_frame, text='IP Address', bg=address_pool_label["bg"], fg=txt_color,
+                 font=self.controller.text_label).grid(row=0, column=0)
+        self.release_ip_combobox = ttk.Combobox(release_ip_frame, width=30, values=[])
+        self.release_ip_combobox.grid(row=0, column=1, sticky=tk.W, padx=5, pady=5)
+        self.mac_entry.grid(row=1, column=1, sticky=tk.W, padx=5, pady=5)
+        tk.Button(release_ip_frame, text='Release IP Address', bg=button_bg, fg=button_fg,
+                  font=self.controller.button_text_font, command=self.release_ip_address).grid(row=2, padx=5, pady=5,
+                                                                                               columnspan=2)
 
         # --------------------------------LEFT FRAME----------------------------------
         address_pool_frame = tk.Frame(master=self, bg="#101010")
@@ -175,11 +208,48 @@ class ServerStartPage(ServerPage):
         self.server_status_text.tag_configure('bold_title', font=('Times', 11, 'bold'))
         self.server_status_text.tag_configure('text', font=('Times', 11))
 
-        tk.Button(address_server_status_label, text="Save Histo", width=10, command=self.file_save, bg=button_bg, fg=button_fg, font=self.controller.button_text_font) \
+        tk.Button(address_server_status_label, text="Save History", width=10, command=self.file_save, bg=button_bg, fg=button_fg, font=self.controller.button_text_font) \
             .grid(row=2, column=0, padx=5, pady=5)
         self.show_packets = tk.IntVar()
         self.show_packets_ch_btn = tk.Checkbutton(address_server_status_label, text="Show Packets", onvalue=1, offvalue=0, command=self.packet_info, variable=self.show_packets, bg=address_server_status_label["bg"], fg='white')
         self.show_packets_ch_btn.grid(row=2, column=1, padx=5, pady=5)
+
+    def release_ip_address(self):
+        ip = self.release_ip_combobox.get()
+        if ip not in self.controller.dhcp_server.address_pool:
+            messagebox.showinfo("IP missing error", "IP not in DHCP Server Address Pool")
+            return
+        ip_list = [ip for ip, ip_info in self.controller.dhcp_server.address_pool.items() if ip_info['mac'] is not None]
+        if ip not in ip_list:
+            messagebox.showinfo("IP missing error", "IP is not yet allocated but someone")
+            return
+        self.controller.dhcp_server.address_pool.update({ip: {'mac': None, 'time': None}})
+        self.controller.dhcp_server.debug("Release ip {}".format(ip))
+        self.addr_pool_text_widget_fill()
+        self.controller.update_frames_address_pool()
+
+    def set_static_ip(self):
+        ip = self.static_ip_combobox.get()
+        dict = self.controller.dhcp_server.address_pool
+        if ip not in dict:
+            messagebox.showinfo("IP missing error", "IP not in DHCP Server Address Pool")
+            return
+        if dict[ip]['mac'] is not None:
+            messagebox.showinfo("IP taken error", "IP {} is already taken".format(ip))
+            return
+        mac_unk = (self.mac_entry.get()).lower()
+        mac_checker = lambda mac: re.match("([0-9a-f]{2}[:]){5}([0-9a-f]{2})", mac)
+        if mac_checker(mac_unk) is None:
+            messagebox.showinfo("MAC format error", "MAC format is xx:xx:xx:xx:xx:xx where x in [0-9a-f]")
+            return
+        if any(mac_unk in ip_info.values() for ip_info in self.controller.dhcp_server.address_pool.values()):
+            messagebox.showinfo("Address Pool Error", "This mac already holds an ip address")
+            return
+        self.controller.dhcp_server.address_pool.update({ip: {'mac': mac_unk, 'time': None}})
+        self.controller.dhcp_server.old_mac_ip.update({ip: mac_unk})
+        self.controller.dhcp_server.debug("Static allocation for mac {}".format(mac_unk))
+        self.addr_pool_text_widget_fill()
+        self.controller.update_frames_address_pool()
 
     def file_save(self):
         f = open("dhcp_histo.txt", "w")
@@ -207,9 +277,9 @@ class ServerStartPage(ServerPage):
         self.start_server_button['state'] = tk.NORMAL
 
     def stop_server(self):
+        self.controller.stop_server()
         self.stop_server_button['state'] = tk.DISABLED
         self.other_page.set_pool_address_button['state'] = tk.NORMAL
-        self.controller.stop_server()
         activate_btn_thread = threading.Thread(target=self.activate_start_button)
         activate_btn_thread.daemon = True
         activate_btn_thread.start()
@@ -221,10 +291,10 @@ class ServerStartPage(ServerPage):
         self.ip_address_pool_text.insert(tk.END, "Broadcast Address : ", 'bold_title')
         self.ip_address_pool_text.insert(tk.END, "{}\n".format(
         self.controller.dhcp_server.address_pool_broadcast), 'text')
-        self.ip_address_pool_text.insert(tk.END, "IP\t\tMAC\t\tLease Time\n", 'bold_title')
+        self.ip_address_pool_text.insert(tk.END, "IP\t\tMAC\t\tLease Time\t\t\tOld MAC\n", 'bold_title')
 
         for key, value in self.controller.dhcp_server.address_pool.items():
-            self.ip_address_pool_text.insert(tk.END, "{}\t\t{}\t\t{}\n".format(key, value['mac'], value['time'].strftime("%m/%d/%Y, %H:%M:%S") if value['time'] is not None else "None"), 'text')
+            self.ip_address_pool_text.insert(tk.END, "{}\t\t{}\t\t{}\t\t\t{}\n".format(key, value['mac'], value['time'].strftime("%m/%d/%Y, %H:%M:%S") if value['time'] is not None else "None", self.controller.dhcp_server.old_mac_ip[key]), 'text')
 
 
 class ServerConfigurationsPage(ServerPage):
@@ -269,7 +339,7 @@ class ServerConfigurationsPage(ServerPage):
         address_pool_viewer_label = tk.LabelFrame(address_pool_frame, text="Address Pool Viewer", bg=label_bg, fg='yellow', font=self.controller.text_label_title)
         address_pool_viewer_label.grid(row=1, column=0, padx=10, pady=10, sticky='w')
 
-        self.ip_address_pool_text = tk.Text(address_pool_viewer_label, height=10, width=50, bg="#101010", fg='light green')
+        self.ip_address_pool_text = tk.Text(address_pool_viewer_label, height=25, width=50, bg="#101010", fg='light green')
         ip_address_pool_scroll = tk.Scrollbar(address_pool_viewer_label, command=self.ip_address_pool_text.yview)
         self.ip_address_pool_text['yscrollcommand'] = ip_address_pool_scroll.set
         self.ip_address_pool_text.grid(row=0, column=0, sticky=tk.N+tk.S)
@@ -296,45 +366,6 @@ class ServerConfigurationsPage(ServerPage):
         tk.Button(lease_time_label_frame, text='Set Lease Time', bg=button_bg, fg=button_fg, font=self.controller.button_text_font, command=self.set_server_lease_time).grid(row=2, padx=5, pady=5, columnspan=2)
         self.server_name_entry.insert(0, "DHCP Server")
         self.lease_time_entry.insert(0, "600")
-
-        # allocate static ip
-        static_ip_alloc_frame = tk.LabelFrame(widget_frame, text="Static IP Allocation", bg=label_bg, fg=label_txt, font=self.controller.text_label_title)
-        static_ip_alloc_frame.grid(row=2, column=0, padx=10, pady=10, sticky="w")
-        tk.Label(static_ip_alloc_frame, text='IP Address', bg=address_pool_label["bg"], fg=txt_color, font=self.controller.text_label).grid(row=0, column=0)
-        self.static_ip_combobox = ttk.Combobox(static_ip_alloc_frame, width=30, values=[])
-
-        self.static_ip_combobox.grid(row=0, column=1, sticky=tk.W, padx=5, pady=5)
-        tk.Label(static_ip_alloc_frame, text='MAC', bg=address_pool_label["bg"], fg=txt_color, font=self.controller.text_label).grid(row=1, column=0)
-        self.mac_entry = tk.Entry(static_ip_alloc_frame, width=30)
-        self.mac_entry.grid(row=1, column=1, sticky=tk.W, padx=5, pady=5)
-        tk.Button(static_ip_alloc_frame, text='Set IP Address', bg=button_bg, fg=button_fg,
-                  font=self.controller.button_text_font, command=self.set_static_ip).grid(row=2, padx=5, pady=5,
-                                                                                            columnspan=2)
-
-    def set_static_ip(self):
-        ip = self.static_ip_combobox.get()
-        dict = self.controller.dhcp_server.address_pool
-        if ip not in dict:
-            messagebox.showinfo("IP missing error", "IP not in DHCP Server Address Pool")
-            return
-        if dict[ip]['mac'] is not None:
-            messagebox.showinfo("IP taken error", "IP {} is already taken".format(ip))
-            return
-        mac_unk = (self.mac_entry.get()).lower()
-        mac_checker = lambda mac: re.match("([0-9a-f]{2}[:]){5}([0-9a-f]{2})", mac)
-        if mac_checker(mac_unk) is None:
-            messagebox.showinfo("MAC format error", "MAC format is xx:xx:xx:xx:xx:xx where x in [0-9a-f]")
-            return
-        if any(mac_unk in ip_info.values() for ip_info in self.controller.dhcp_server.address_pool.values()):
-            messagebox.showinfo("Address Pool Error", "This mac already holds an ip address")
-            return
-        self.controller.dhcp_server.address_pool.update({ip: {'mac': mac_unk, 'time': None}})
-        self.addr_pool_text_widget_fill()
-        self.other_page.addr_pool_text_widget_fill()
-
-        self.static_ip_combobox.configure(
-            values=[ip for ip, ip_info in self.controller.dhcp_server.address_pool.items() if ip_info['mac'] is None])
-
 
     @staticmethod
     def _get_ip_network_of_ipv4(ipv4, mask):
@@ -366,8 +397,8 @@ class ServerConfigurationsPage(ServerPage):
             self.controller.dhcp_server.set_address_pool_config(starting_ip, mask_result)
             self.controller.dhcp_server.set_address_pool()
 
-            #self.addr_pool_text_widget_fill()
             self.controller.update_frames_address_pool()
+            self.addr_pool_text_widget_fill()
             if self.other_page.server_name_label_var.get() != "unknown" and self.other_page.lease_time_label_var != "unknown":
                 self.other_page.start_server_button['state'] = tk.NORMAL
         except socket.error:
