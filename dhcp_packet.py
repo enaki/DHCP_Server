@@ -55,11 +55,11 @@ class Decoder:
         return mac
 
 
-class DHCP_Packet_Type(IntEnum):
+class DHCP_Message_Type(IntEnum):
     NONE = 0
     DHCP_DISCOVER = 1
     DHCP_OFFER = 2
-    DHCP_REQEUST = 3
+    DHCP_REQUEST = 3
     DHCP_DECLINE = 4
     DHCP_ACK = 5
     DHCP_NAK = 6
@@ -67,9 +67,33 @@ class DHCP_Packet_Type(IntEnum):
     DHCP_INFORM = 8
 
 
+class DHCP_Opcode(IntEnum):
+    NONE = 0
+    REQUEST = 1
+    REPLY = 2
+
+
+#   for all DHCP_OPTIONS go to
+#   https://www.iana.org/assignments/bootp-dhcp-parameters/bootp-dhcp-parameters.xhtml
+class DHCP_Options(IntEnum):
+    OP_PADDING = 0
+    OP_SUBNETMASK = 1
+    OP_ROUTER = 3
+    OP_DNS = 6
+    OP_BROADCAST_ADDRESS = 28
+    OP_REQUESTED_IP = 50
+    OP_LEASE_TIME = 51
+    OP_MESSAGE_TYPE = 53
+    OP_PARAM_REQ_LIST = 55
+    OP_RENEWAL_TIME = 58
+    OP_REBINDING_TIME = 59
+    OP_CLIENT_ID = 61
+    OP_END = 255
+
+
 MAGIC_COOKIE = b'\x63\x82\x53\x63'
 DHCP_Packet_Fields = [
-    {'id': 'op', 'name': 'message_type', 'length': 1, 'type': 'int'},
+    {'id': 'op', 'name': 'opcode', 'length': 1, 'type': 'int'},
     {'id': 'htype', 'name': 'hardware_type', 'length': 1, 'type': 'int'},
     {'id': 'hlen', 'name': 'hardware_address_length', 'length': 1, 'type': 'int'},
     {'id': 'hops', 'name': 'hops', 'length': 1, 'type': 'int'},
@@ -83,13 +107,23 @@ DHCP_Packet_Fields = [
     {'id': 'chaddr', 'name': 'client_hardware_address', 'length': 16, 'type': 'mac'},
     {'id': 'sname', 'name': 'server_name', 'length': 64, 'type': 'str'},
     {'id': 'filename', 'name': 'boot_filename', 'length': 128, 'type': 'str'},
-    {'id': 'options', 'name': 'options', 'length': 4, 'type': 'hex'},
+    {'id': 'magic_cookie', 'name': 'magic_cookie', 'length': 4, 'type': 'hex'},
+]
+
+#these fields will be added to dhcp packet
+DHCP_Options_Fields = [
+    {'id': DHCP_Options.OP_MESSAGE_TYPE, 'name': 'message_type', 'length': 1, 'type': 'int'},
+    {'id': DHCP_Options.OP_SUBNETMASK, 'name': 'subnet_mask', 'length': 1, 'type': 'int'},
+    {'id': DHCP_Options.OP_BROADCAST_ADDRESS, 'name': 'broadcast_address', 'length': 4, 'type': 'ip'},
+    {'id': DHCP_Options.OP_LEASE_TIME, 'name': 'lease_time', 'length': 4, 'type': 'int'},
+    {'id': DHCP_Options.OP_RENEWAL_TIME, 'name': 'renewal_time', 'length': 4, 'type': 'int'},
+    {'id': DHCP_Options.OP_REBINDING_TIME, 'name': 'rebinding_time', 'length': 4, 'type': 'int'},
 ]
 
 
 class DHCP_PACKET:
-    def __init__(self, data):
-        self.message_type = DHCP_Packet_Type(Decoder.int(data[0:1])) if data else DHCP_Packet_Type(0)
+    def __init__(self, data, opcode=DHCP_Opcode.NONE, message_type=DHCP_Message_Type.NONE, subnet_mask=None, broadcast_address=None, lease_time=None):
+        self.opcode = DHCP_Opcode(Decoder.int(data[0:1])) if data else opcode
         self.hardware_type = Decoder.int(data[1:2]) if data else 1
         self.hardware_address_length = Decoder.int(data[2:3]) if data else 6
         self.hops = Decoder.int(data[3:4]) if data else 0
@@ -103,7 +137,33 @@ class DHCP_PACKET:
         self.client_hardware_address = Decoder.mac(data[28:34]) if data else '12:34:45:ab:cd:ef'
         self.server_name = Decoder.str(data[44:108]) if data else ''
         self.boot_filename = Decoder.str(data[108:236]) if data else ''
-        self.options = Decoder.int(data[236:240]) if data else int.from_bytes(MAGIC_COOKIE, byteorder='big')
+        self.magic_cookie = Decoder.int(data[236:240]) if data else int.from_bytes(MAGIC_COOKIE, byteorder='big')
+
+        #dhcp options
+        self.message_type = message_type
+        self.subnet_mask = subnet_mask
+        self.broadcast_address = broadcast_address
+        self.lease_time = lease_time
+        self.renewal_time = lease_time // 2 if self.lease_time is not None else None
+        self.rebinding_time = lease_time * 7 // 8 if self.lease_time is not None else None
+        if data:
+            self.decode_options(data[240:])
+
+    def set_lease_time(self, lease_time):
+        self.lease_time = lease_time
+        self.renewal_time = lease_time // 2 if self.lease_time is not None else None
+        self.rebinding_time = lease_time * 7 // 8 if self.lease_time is not None else None
+
+    def decode_options(self, data_options):
+        index = 0
+        while index < data_options.__len__() and data_options[index] != 255:
+            int_byte_value = data_options[index]
+            option = next(item for item in DHCP_Options_Fields if item['id'] == DHCP_Options(int_byte_value))
+            length_option = option['length']
+            index += 2
+            function_for_decoding = getattr(Decoder, option['type'])
+            setattr(self, option['name'], function_for_decoding(data_options[index: index+length_option]))
+            index += length_option
 
     def encode(self):
         data = b''
@@ -112,12 +172,19 @@ class DHCP_PACKET:
             length = option['length']
             function = getattr(Encoder, option['type'])
             data += function(value, length)
+        for option in DHCP_Options_Fields:
+            value = getattr(self, option['name'])
+            length = option['length']
+            if value is not None:
+                function = getattr(Encoder, option['type'])
+                data += Encoder.int(option['id']) + Encoder.int(length) + function(value, length)
+        data += Encoder.int(DHCP_Options.OP_END)
         return data
 
     def __str__(self):
         string = ""
         string += "------Packet Info-------\n"
-        string += "Message_type : {}\n".format(self.message_type.name)
+        string += "Opcode : {}\n".format(self.opcode.name)
         string += "Hardware Type : {}\n".format(self.hardware_type)
         string += "Hardware Address Length : 0x{}\n".format(self.hardware_address_length)
         string += "Hops : {}\n".format(self.hops)
@@ -131,5 +198,12 @@ class DHCP_PACKET:
         string += "Client Hardware Address : {}\n".format(self.client_hardware_address)
         string += "Server Name : {}\n".format(self.server_name)
         string += "Boot Filename : {}\n".format(self.boot_filename)
-        string += "Options : {}\n".format(hex(self.options))
+        string += "Magic Cookie : {}\n".format(hex(self.magic_cookie))
+        string += "--Options\n"
+        string += "Message Type : {}\n".format(DHCP_Message_Type(self.message_type).name) if self.message_type != DHCP_Message_Type.NONE else ""
+        string += "Broadcast Address : {}\n".format(self.broadcast_address) if self.broadcast_address is not None else ""
+        string += "Subnet Mask : /{}\n".format(self.subnet_mask) if self.subnet_mask is not None else ""
+        string += "Lease Time : {}\n".format(self.lease_time) if self.lease_time is not None else ""
+        string += "Renewal Time : {}\n".format(self.renewal_time) if self.renewal_time is not None else ""
+        string += "Rebinding Time : {}\n".format(self.rebinding_time) if self.rebinding_time is not None else ""
         return string

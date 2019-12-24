@@ -42,6 +42,11 @@ class DHCP_Server_GUI(tk.Tk):
         self.frames['ServerConfigurationsPage'].set_other_page(self.frames['ServerStartPage'])
         self.show_frame("ServerConfigurationsPage")
 
+    def update_frames_address_pool(self):
+        self.frames["ServerStartPage"].addr_pool_text_widget_fill()
+        self.frames["ServerConfigurationsPage"].static_ip_combobox.configure(
+            values=[ip for ip, ip_info in self.dhcp_server.address_pool.items() if ip_info['mac'] is None])
+
     def start_server(self):
         self.server_thread = threading.Thread(target=self.dhcp_server.start_server)
         self.server_thread.daemon = True
@@ -216,10 +221,10 @@ class ServerStartPage(ServerPage):
         self.ip_address_pool_text.insert(tk.END, "Broadcast Address : ", 'bold_title')
         self.ip_address_pool_text.insert(tk.END, "{}\n".format(
         self.controller.dhcp_server.address_pool_broadcast), 'text')
-        self.ip_address_pool_text.insert(tk.END, "IP\t\tMAC\n", 'bold_title')
+        self.ip_address_pool_text.insert(tk.END, "IP\t\tMAC\t\tLease Time\n", 'bold_title')
 
         for key, value in self.controller.dhcp_server.address_pool.items():
-            self.ip_address_pool_text.insert(tk.END, "{}\t\t{}\n".format(key, value), 'text')
+            self.ip_address_pool_text.insert(tk.END, "{}\t\t{}\t\t{}\n".format(key, value['mac'], value['time'].strftime("%m/%d/%Y, %H:%M:%S") if value['time'] is not None else "None"), 'text')
 
 
 class ServerConfigurationsPage(ServerPage):
@@ -312,7 +317,7 @@ class ServerConfigurationsPage(ServerPage):
         if ip not in dict:
             messagebox.showinfo("IP missing error", "IP not in DHCP Server Address Pool")
             return
-        if dict[ip] is not None:
+        if dict[ip]['mac'] is not None:
             messagebox.showinfo("IP taken error", "IP {} is already taken".format(ip))
             return
         mac_unk = (self.mac_entry.get()).lower()
@@ -320,15 +325,15 @@ class ServerConfigurationsPage(ServerPage):
         if mac_checker(mac_unk) is None:
             messagebox.showinfo("MAC format error", "MAC format is xx:xx:xx:xx:xx:xx where x in [0-9a-f]")
             return
-        if mac_unk in self.controller.dhcp_server.address_pool.values():
+        if any(mac_unk in ip_info.values() for ip_info in self.controller.dhcp_server.address_pool.values()):
             messagebox.showinfo("Address Pool Error", "This mac already holds an ip address")
             return
-        self.controller.dhcp_server.address_pool.update({ip: mac_unk})
+        self.controller.dhcp_server.address_pool.update({ip: {'mac': mac_unk, 'time': None}})
         self.addr_pool_text_widget_fill()
         self.other_page.addr_pool_text_widget_fill()
 
         self.static_ip_combobox.configure(
-            values=[ip for ip, mac in self.controller.dhcp_server.address_pool.items() if mac is None])
+            values=[ip for ip, ip_info in self.controller.dhcp_server.address_pool.items() if ip_info['mac'] is None])
 
 
     @staticmethod
@@ -362,9 +367,7 @@ class ServerConfigurationsPage(ServerPage):
             self.controller.dhcp_server.set_address_pool()
 
             #self.addr_pool_text_widget_fill()
-            self.other_page.addr_pool_text_widget_fill()
-
-            self.static_ip_combobox.configure(values=[ip for ip, mac in self.controller.dhcp_server.address_pool.items() if mac is None])
+            self.controller.update_frames_address_pool()
             if self.other_page.server_name_label_var.get() != "unknown" and self.other_page.lease_time_label_var != "unknown":
                 self.other_page.start_server_button['state'] = tk.NORMAL
         except socket.error:
@@ -397,7 +400,8 @@ class ServerConfigurationsPage(ServerPage):
     def set_server_lease_time(self):
         lease_time = self.lease_time_entry.get()
         self.controller.dhcp_server.debug("Set Lease Time {}".format(lease_time))
-        self.other_page.lease_time_label_var.set(lease_time)
+        import time
+        self.other_page.lease_time_label_var.set("{} days {}".format(int(lease_time) // 86400, time.strftime('%H:%M:%S', time.gmtime(int(lease_time)))))
         self.controller.dhcp_server.set_server_lease_time(int(lease_time))
         if self.other_page.server_name_label_var.get() != "unknown" and self.other_page.mask_label_var.get() != "unknown":
             self.other_page.start_server_button['state'] = tk.NORMAL

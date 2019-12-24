@@ -24,8 +24,17 @@ def test_Decoder():
     print(Decoder.mac(mac))
     print(Decoder.str(mac))
 
+def test_Packet():
+    packet = DHCP_PACKET(None, lease_time=600, broadcast_address='255.255.255.255', subnet_mask=24)
+    packet.opcode = DHCP_Opcode.REQUEST
+    packet.message_type = DHCP_Message_Type.DHCP_ACK
+    print(packet)
+    data = packet.encode()
+    new_packet = DHCP_PACKET(data)
+    print(new_packet)
 
 def main():
+    #test_Packet()
     #dhcp_server = DHCP_Server()
     #dhcp_server.start_server()
     start_gui()
