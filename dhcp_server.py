@@ -114,7 +114,8 @@ class DHCP_Server:
         self.old_mac_ip.update({dhcp_packet.client_ip_address: dhcp_packet.client_hardware_address})
         # self.server_socket.send(dhcp_packet.encode(), self.port)
         self.debug_packet(dhcp_packet)
-        self.gui.update_frames_address_pool()
+        if self.gui:
+            self.gui.update_frames_address_pool()
 
         message = dhcp_packet.encode()
         self.server_socket.sendto(message, self.dest)

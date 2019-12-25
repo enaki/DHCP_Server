@@ -157,13 +157,17 @@ class DHCP_PACKET:
     def decode_options(self, data_options):
         index = 0
         while index < data_options.__len__() and data_options[index] != 255:
-            int_byte_value = data_options[index]
-            option = next(item for item in DHCP_Options_Fields if item['id'] == DHCP_Options(int_byte_value))
-            length_option = option['length']
-            index += 2
-            function_for_decoding = getattr(Decoder, option['type'])
-            setattr(self, option['name'], function_for_decoding(data_options[index: index+length_option]))
-            index += length_option
+            try:
+                int_byte_value = data_options[index]
+                option = next(item for item in DHCP_Options_Fields if item['id'] == DHCP_Options(int_byte_value))
+                length_option = option['length']
+                index += 2
+                function_for_decoding = getattr(Decoder, option['type'])
+                setattr(self, option['name'], function_for_decoding(data_options[index: index+length_option]))
+                index += length_option
+            except ValueError:
+                #Received package from another server
+                break
 
     def encode(self):
         data = b''
