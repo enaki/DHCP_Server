@@ -8,13 +8,15 @@ serverPort = 67
 clientPort = 68
 MAX_BYTES = 1024
 
-def Client_1():
-    UDP_IP = '0.0.0.0'
-    UDP_PORT = 68
+UDP_IP = '0.0.0.0'
+UDP_PORT = 68
 
+
+def client_1():
     dst = ('<broadcast>', serverPort)
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sock.bind((UDP_IP, clientPort))
 
     log.info("Sending DHCP_DISCOVER packet:")
@@ -56,13 +58,11 @@ def Client_1():
     sock.close()
 
 
-def Client_2():
-    UDP_IP = '0.0.0.0'
-    UDP_PORT = 68
-
+def client_2():
     dst = ('<broadcast>', serverPort)
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sock.bind((UDP_IP, clientPort))
 
     log.info("Sending DHCP_DISCOVER packet:")
@@ -103,6 +103,7 @@ def Client_2():
         exit(1)
     sock.close()
 
+
 if __name__=='__main__':
-    #Client_1()
-    Client_2()
+    #client_1()
+    client_2()

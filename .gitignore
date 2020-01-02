@@ -1,8 +1,8 @@
 .idea
 __pycache__
 server_test.py
-udp_receive.py
-udp_send.py
-test_gui.py
+test_folder/udp_receive.py
+test_folder/udp_send.py
+test_folder/test_gui.py
 TextHandler.py
-dhcp_histo.txt
+dhcp_history.txt

@@ -156,6 +156,7 @@ class DHCP_PACKET:
 
     def decode_options(self, data_options):
         index = 0
+        int_byte_value = 0
         while index < data_options.__len__() and data_options[index] != 255:
             try:
                 int_byte_value = data_options[index]
@@ -167,6 +168,8 @@ class DHCP_PACKET:
                 index += length_option
             except ValueError:
                 #Received package from another server
+                import logging as log
+                log.info("Dhcp option {} is unknown for me".format(int_byte_value))
                 break
 
     def encode(self):
