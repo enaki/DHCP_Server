@@ -6,3 +6,5 @@ test_folder/udp_send.py
 test_folder/test_gui.py
 TextHandler.py
 dhcp_history.txt
+address_pool.json
+old_mac.json

@@ -44,6 +44,8 @@ class ServerConfigurationsPage(ServerPage):
         self.set_pool_address_button.grid(row=2, column=1, padx=5, pady=5)
         tk.Button(address_pool_label, text='View Pool Address', command=self.addr_pool_text_widget_fill, bg=button_bg,
                   fg=button_fg, font=self.controller.button_text_font).grid(row=2, column=0, padx=5, pady=5)
+        self.load_address_var = tk.IntVar()
+        tk.Checkbutton(address_pool_label, variable=self.load_address_var, bg=label_bg, fg='red', text='Load Address Pool from json').grid(row=3, column=0, columnspan=2)
 
         address_pool_viewer_label = tk.LabelFrame(address_pool_frame, text="Address Pool Viewer", bg=label_bg, fg='yellow', font=self.controller.text_label_title)
         address_pool_viewer_label.grid(row=1, column=0, padx=10, pady=10, sticky='w')
@@ -95,27 +97,35 @@ class ServerConfigurationsPage(ServerPage):
         return mask_result
 
     def set_pool_address(self):
-        mask = self.mask_entry.get()
-        ip = self.ip_address_entry.get()
-        self.controller.dhcp_server.debug("Set pool address")
-        try:
-            mask_result = self._check_pool_is_correct(ip, mask)
-            starting_ip = self._get_ip_network_of_ipv4(ip, mask_result)
-            self.other_page.ip_address_label_var.set(starting_ip)
-            self.other_page.mask_label_var.set("/{}".format(mask_result))
-            self.controller.dhcp_server.set_address_pool_config(starting_ip, mask_result)
-            self.controller.dhcp_server.set_address_pool()
+        if self.load_address_var.get():
+            self.controller.dhcp_server.load_address_pool_from_json()
+            self.mask_entry.current(self.controller.dhcp_server.address_pool_mask-16)
+            self.ip_address_entry.delete(0, tk.END)
+            self.ip_address_entry.insert(0, self.controller.dhcp_server.address_pool_starting_ip_address)
+            self.other_page.ip_address_label_var.set(self.ip_address_entry.get())
+            self.other_page.mask_label_var.set(self.mask_entry.get())
+        else:
+            mask = self.mask_entry.get()
+            ip = self.ip_address_entry.get()
+            self.controller.dhcp_server.debug("Set pool address")
+            try:
+                mask_result = self._check_pool_is_correct(ip, mask)
+                starting_ip = self._get_ip_network_of_ipv4(ip, mask_result)
+                self.other_page.ip_address_label_var.set(starting_ip)
+                self.other_page.mask_label_var.set("/{}".format(mask_result))
+                self.controller.dhcp_server.set_address_pool_config(starting_ip, mask_result)
+                self.controller.dhcp_server.set_address_pool()
+            except socket.error:
+                messagebox.showinfo("IP Format error", "IP Format: x.x.x.x where x = 0-255")
+            except ValueError:
+                messagebox.showinfo("Mask Format error", "Mask Format: x or \\x, where x = 1-32")
+            except OSError:
+                messagebox.showinfo("IP Format error", "IP Format: x.x.x.x where x = 0-255")
 
-            self.controller.update_frames_address_pool()
-            self.addr_pool_text_widget_fill()
-            if self.other_page.server_name_label_var.get() != "unknown" and self.other_page.lease_time_label_var != "unknown":
-                self.other_page.start_server_button['state'] = tk.NORMAL
-        except socket.error:
-            messagebox.showinfo("IP Format error", "IP Format: x.x.x.x where x = 0-255")
-        except ValueError:
-            messagebox.showinfo("Mask Format error", "Mask Format: x or \\x, where x = 1-32")
-        except OSError:
-            messagebox.showinfo("IP Format error", "IP Format: x.x.x.x where x = 0-255")
+        self.controller.update_frames_address_pool()
+        self.addr_pool_text_widget_fill()
+        if self.other_page.server_name_label_var.get() != "unknown" and self.other_page.lease_time_label_var != "unknown":
+            self.other_page.start_server_button['state'] = tk.NORMAL
 
     def addr_pool_text_widget_fill(self):
         mask = self.mask_entry.get()

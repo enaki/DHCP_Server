@@ -52,6 +52,20 @@ class ServerStartPage(ServerPage):
         tk.Label(server_info_label, text="Lease Time: ", bg=server_info_label["bg"], fg=txt_color, font=self.controller.text_label).grid(row=1, column=0, sticky='w')
         tk.Label(server_info_label, textvariable=self.lease_time_label_var, bg=server_info_label["bg"], fg=button_fg, font=self.controller.text_label, width=20).grid(row=1, column=1, sticky='w')
 
+        self.router_level_var = tk.StringVar()
+        self.router_level_var.set(self.controller.dhcp_server.router)
+        tk.Label(server_info_label, text="Router: ", bg=server_info_label["bg"], fg=txt_color,
+                 font=self.controller.text_label).grid(row=2, column=0, sticky='w')
+        tk.Label(server_info_label, textvariable=self.router_level_var, bg=server_info_label["bg"], fg=button_fg,
+                 font=self.controller.text_label, width=20).grid(row=2, column=1, sticky='w')
+
+        self.dns_lavel_var = tk.StringVar()
+        self.dns_lavel_var.set(self.controller.dhcp_server.dns)
+        tk.Label(server_info_label, text="DNS: ", bg=server_info_label["bg"], fg=txt_color,
+                 font=self.controller.text_label).grid(row=3, column=0, sticky='w')
+        tk.Label(server_info_label, textvariable=self.dns_lavel_var, bg=server_info_label["bg"], fg=button_fg,
+                 font=self.controller.text_label, width=20).grid(row=3, column=1, sticky='w')
+
         #------Addres pool info
         address_pool_label = tk.LabelFrame(server_info_frame, text="Address Pool", bg=label_bg, fg='yellow', font=self.controller.text_label_title)
         address_pool_label.grid(row=1, column=0, padx=10, pady=10, sticky="w")
@@ -97,6 +111,29 @@ class ServerStartPage(ServerPage):
         tk.Button(release_ip_frame, text='Release IP Address', bg=button_bg, fg=button_fg,
                   font=self.controller.button_text_font, command=self.release_ip_address).grid(row=2, padx=5, pady=5,
                                                                                                columnspan=2)
+
+        #projet info
+        project_info_label = tk.LabelFrame(server_info_frame, text="Project Info", bg=label_bg, fg='orange',
+                                          font=self.controller.text_label_title)
+        project_info_label.grid(row=4, column=0, padx=10, pady=10, sticky="w")
+
+        tk.Label(project_info_label, text="Student: ", bg=server_info_label["bg"], fg='cyan',
+                 font=self.controller.text_label).grid(row=0, column=0, sticky='w')
+        tk.Label(project_info_label, text='Enachi Vasile', bg=server_info_label["bg"], fg=button_fg,
+                 font=self.controller.text_label, width=20).grid(row=0, column=1, sticky='w')
+        tk.Label(project_info_label, text="Grupa: ", bg=server_info_label["bg"], fg='cyan',
+                 font=self.controller.text_label).grid(row=1, column=0, sticky='w')
+        tk.Label(project_info_label, text='1308B', bg=server_info_label["bg"], fg=button_fg,
+                 font=self.controller.text_label, width=20).grid(row=1, column=1, sticky='w')
+        tk.Label(project_info_label, text="An de studiu: ", bg=server_info_label["bg"], fg='cyan',
+                 font=self.controller.text_label).grid(row=2, column=0, sticky='w')
+        tk.Label(project_info_label, text='2019-2020', bg=server_info_label["bg"], fg=button_fg,
+                 font=self.controller.text_label, width=20).grid(row=2, column=1, sticky='w')
+        tk.Label(project_info_label, text="Profesor: ", bg=server_info_label["bg"], fg='cyan',
+                 font=self.controller.text_label).grid(row=3, column=0, sticky='w')
+        tk.Label(project_info_label, text='Nicolae Botezatu', bg=server_info_label["bg"], fg=button_fg,
+                 font=self.controller.text_label, width=20).grid(row=3, column=1, sticky='w')
+
 
         # --------------------------------LEFT FRAME----------------------------------
         address_pool_frame = tk.Frame(master=self, bg="#101010")

@@ -72,13 +72,13 @@ class DHCP_Opcode(IntEnum):
     REQUEST = 1
     REPLY = 2
 
-
 #   for all DHCP_OPTIONS go to
 #   https://www.iana.org/assignments/bootp-dhcp-parameters/bootp-dhcp-parameters.xhtml
 class DHCP_Options(IntEnum):
     OP_PADDING = 0
     OP_SUBNETMASK = 1
     OP_ROUTER = 3
+    OP_SERVER_NAME = 5
     OP_DNS = 6
     OP_BROADCAST_ADDRESS = 28
     OP_REQUESTED_IP = 50
@@ -113,16 +113,23 @@ DHCP_Packet_Fields = [
 #these fields will be added to dhcp packet
 DHCP_Options_Fields = [
     {'id': DHCP_Options.OP_MESSAGE_TYPE, 'name': 'message_type', 'length': 1, 'type': 'int'},
-    {'id': DHCP_Options.OP_SUBNETMASK, 'name': 'subnet_mask', 'length': 1, 'type': 'int'},
-    {'id': DHCP_Options.OP_BROADCAST_ADDRESS, 'name': 'broadcast_address', 'length': 4, 'type': 'ip'},
     {'id': DHCP_Options.OP_LEASE_TIME, 'name': 'lease_time', 'length': 4, 'type': 'int'},
     {'id': DHCP_Options.OP_RENEWAL_TIME, 'name': 'renewal_time', 'length': 4, 'type': 'int'},
     {'id': DHCP_Options.OP_REBINDING_TIME, 'name': 'rebinding_time', 'length': 4, 'type': 'int'},
 ]
 
+DHCP_Requested_Options_Fields = [
+    {'id': DHCP_Options.OP_ROUTER, 'name': 'router', 'length': 0, 'type': 'str'},
+    {'id': DHCP_Options.OP_SERVER_NAME, 'name': 'server_name', 'length': 0, 'type': 'str'},
+    {'id': DHCP_Options.OP_DNS, 'name': 'dns', 'length': 0, 'type': 'str'},
+    {'id': DHCP_Options.OP_SUBNETMASK, 'name': 'subnet_mask', 'length': 4, 'type': 'ip'},
+    {'id': DHCP_Options.OP_BROADCAST_ADDRESS, 'name': 'broadcast_address', 'length': 4, 'type': 'ip'},
+    {'id': DHCP_Options.OP_REQUESTED_IP, 'name': 'your_ip_address', 'length': 4, 'type': 'ip'}
+]
+
 
 class DHCP_PACKET:
-    def __init__(self, data, opcode=DHCP_Opcode.NONE, message_type=DHCP_Message_Type.NONE, subnet_mask=None, broadcast_address=None, lease_time=None):
+    def __init__(self, data, opcode=DHCP_Opcode.NONE, message_type=DHCP_Message_Type.NONE, lease_time=None, options=None, server_mode=False):
         self.opcode = DHCP_Opcode(Decoder.int(data[0:1])) if data else opcode
         self.hardware_type = Decoder.int(data[1:2]) if data else 1
         self.hardware_address_length = Decoder.int(data[2:3]) if data else 6
@@ -141,13 +148,28 @@ class DHCP_PACKET:
 
         #dhcp options
         self.message_type = message_type
-        self.subnet_mask = subnet_mask
-        self.broadcast_address = broadcast_address
+        self.subnet_mask = None
+        self.broadcast_address = None
         self.lease_time = lease_time
         self.renewal_time = lease_time // 2 if self.lease_time is not None else None
         self.rebinding_time = lease_time * 7 // 8 if self.lease_time is not None else None
+        self.request_options = options if options else []
+
+        self.server_mode = server_mode
+        #requested options
+        self.dns = None
+        self.router = None
         if data:
             self.decode_options(data[240:])
+
+    def set_subnet_mask(self, subnet_mask):
+        try:
+            int(subnet_mask)
+            import ipaddress
+            net = ipaddress.ip_network('192.178.2.55/{}'.format(subnet_mask), strict=False)
+            self.subnet_mask = str(net.netmask)
+        except (ValueError, TypeError):
+            self.subnet_mask = subnet_mask
 
     def set_lease_time(self, lease_time):
         self.lease_time = lease_time
@@ -160,8 +182,18 @@ class DHCP_PACKET:
         while index < data_options.__len__() and data_options[index] != 255:
             try:
                 int_byte_value = data_options[index]
-                option = next(item for item in DHCP_Options_Fields if item['id'] == DHCP_Options(int_byte_value))
-                length_option = option['length']
+                if int_byte_value == 55:
+                    length_option = data_options[index+1]
+                    index += 2
+                    for byte in data_options[index: index+length_option]:
+                        self.request_options.append(int(byte))
+                    index += length_option
+                    continue
+                try:
+                    option = next(item for item in DHCP_Options_Fields if item['id'] == DHCP_Options(int_byte_value))
+                except StopIteration:
+                    option = next(item for item in DHCP_Requested_Options_Fields if item['id'] == DHCP_Options(int_byte_value))
+                length_option = option['length'] if option['length'] != 0 else data_options[index+1]
                 index += 2
                 function_for_decoding = getattr(Decoder, option['type'])
                 setattr(self, option['name'], function_for_decoding(data_options[index: index+length_option]))
@@ -169,7 +201,7 @@ class DHCP_PACKET:
             except ValueError:
                 #Received package from another server
                 import logging as log
-                log.info("Dhcp option {} is unknown for me".format(int_byte_value))
+                log.info("Decoding -> Dhcp option {} is unknown for me".format(int_byte_value))
                 break
 
     def encode(self):
@@ -185,6 +217,34 @@ class DHCP_PACKET:
             if value is not None:
                 function = getattr(Encoder, option['type'])
                 data += Encoder.int(option['id']) + Encoder.int(length) + function(value, length)
+        #dhcp request parameters according to server mode
+        if not self.server_mode:    #client mode - send request bytes - field 55
+            request_id = 0
+            if self.request_options:
+                try:
+                    data += Encoder.int(55) + Encoder.int(len(self.request_options))
+                    for request_id in self.request_options:
+                        data += Encoder.int(request_id)
+                except ValueError:
+                    # Received package from another server
+                    import logging as log
+                    log.info("Encoding (client mode)-> Dhcp option {} is unknown for me".format(request_id))
+        else:                       #server mode - send requested options
+            request_id = 0
+            try:
+                if self.request_options:
+                    for request_id in self.request_options:
+
+                        item = [item for item in DHCP_Requested_Options_Fields if item['id'] == request_id][0]
+                        value = getattr(self, item['name'])
+                        length = item['length'] if item['length'] != 0 else len(value)
+                        if value is not None:
+                            function = getattr(Encoder, item['type'])
+                            data += Encoder.int(item['id']) + Encoder.int(length) + function(value, length)
+            except (ValueError, IndexError):
+                import logging as log
+                log.info("Encoding (server mode)-> Dhcp option {} is unknown for me".format(request_id))
+
         data += Encoder.int(DHCP_Options.OP_END)
         return data
 
@@ -208,9 +268,24 @@ class DHCP_PACKET:
         string += "Magic Cookie : {}\n".format(hex(self.magic_cookie))
         string += "--Options\n"
         string += "Message Type : {}\n".format(DHCP_Message_Type(self.message_type).name) if self.message_type != DHCP_Message_Type.NONE else ""
-        string += "Broadcast Address : {}\n".format(self.broadcast_address) if self.broadcast_address is not None else ""
-        string += "Subnet Mask : /{}\n".format(self.subnet_mask) if self.subnet_mask is not None else ""
+
         string += "Lease Time : {}\n".format(self.lease_time) if self.lease_time is not None else ""
         string += "Renewal Time : {}\n".format(self.renewal_time) if self.renewal_time is not None else ""
         string += "Rebinding Time : {}\n".format(self.rebinding_time) if self.rebinding_time is not None else ""
+
+        string += "--Requests\n"
+        if self.request_options:
+            for request in self.request_options:
+                string += "{}\n".format(DHCP_Options(request).name)
+        else:
+            if self.broadcast_address:
+                string += "Broadcast Address : {}\n".format(self.broadcast_address)
+            if self.subnet_mask:
+                string += "Subnet Mask : {}\n".format(self.subnet_mask)
+            if self.dns:
+                string += "DNS : {}\n".format(self.dns)
+            if self.server_name:
+                string += "Server name : {}\n".format(self.server_name)
+            if self.router:
+                string += "Router : {}\n".format(self.router)
         return string

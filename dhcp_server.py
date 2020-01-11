@@ -33,6 +33,8 @@ class DHCP_Server:
         self.rebinding_time = None
         self.gui = gui
         self.show_packets_debug = False
+        self.router = '127.0.0.1'
+        self.dns = 'retele_proiect.org'
 
     def set_address_pool_config(self, ip_address, mask):
         self.address_pool_starting_ip_address = ip_address
@@ -133,10 +135,12 @@ class DHCP_Server:
         dhcp_packet.set_lease_time(self.lease_time)
         dhcp_packet.server_name = self.name
         dhcp_packet.broadcast_address = self.address_pool_broadcast
-        dhcp_packet.subnet_mask = self.address_pool_mask
+        dhcp_packet.set_subnet_mask(self.address_pool_mask)
+        dhcp_packet.router = self.router
+        dhcp_packet.dns = self.dns
 
     def _analyze_data(self, data: bytes):
-        dhcp_packet = DHCP_PACKET(data)
+        dhcp_packet = DHCP_PACKET(data, server_mode=True)
         print(dhcp_packet)
         if dhcp_packet.opcode != DHCP_Opcode.REQUEST:
             return
@@ -210,6 +214,8 @@ class DHCP_Server:
                 self.debug("{} is analyzing the request".format(self.name))
                 self._analyze_data(data)
         self.server_is_shut_down = True
+        self.debug("{} is saving address pool to 'address_pool.json'".format(self.name))
+        self.save_address_pool_to_json()
         self.debug("{} has stopped".format(self.name))
 
     def _mac_holds_an_addrees(self, mac):
@@ -256,3 +262,37 @@ class DHCP_Server:
                         self.address_pool.update({ip: {'mac': None, 'time': None}})
                         self.gui.update_frames_address_pool()
             time.sleep(time_sleep)
+
+    def save_address_pool_to_json(self):
+        import json
+        with open('address_pool.json', 'w') as file:
+            log.info("Saving address pool status to address_pool.json")
+            file.write(json.dumps(self.address_pool, indent=2, sort_keys=True, default=str))
+        with open('old_mac.json', 'w') as file:
+            log.info("Saving old mac history to old_mac.json")
+            file.write(json.dumps(self.old_mac_ip, indent=2, sort_keys=True, default=str))
+
+    def load_address_pool_from_json(self, path_pool='address_pool.json', path_old_mac='old_mac.json'):
+        import json
+        import math
+        import ipaddress
+        try:
+            with open(path_pool, 'r') as file:
+                log.info("Loading address pool status to address_pool.json")
+                self.address_pool = json.load(file)
+                for item in self.address_pool.values():
+                    if item['time'] is not None:
+                        item['time'] = datetime.datetime.strptime(item['time'], '%Y-%m-%d %H:%M:%S.%f')
+                self.address_pool_mask = 32 - int(math.log(len(self.address_pool.keys()) + 2, 2))
+                host = ipaddress.IPv4Address(list(self.address_pool.keys())[0])
+                net = ipaddress.IPv4Network(list(self.address_pool.keys())[0] + '/' + str(self.address_pool_mask), False)
+                self.address_pool_starting_ip_address = str(ipaddress.IPv4Address(int(host) & int(net.netmask)))
+                self.address_pool_broadcast = str(net.broadcast_address)
+                log.info("Setting mask: {}".format(self.address_pool_mask))
+                log.info("Setting network address: {}".format(self.address_pool_starting_ip_address))
+                log.info("Setting network broadcast address: {}".format(self.address_pool_broadcast))
+            with open(path_old_mac, 'r') as file:
+                log.info("Loading old mac history to old_mac.json")
+                self.old_mac_ip = json.load(file)
+        except json.decoder.JSONDecodeError:
+            log.info("JSON corrupted or empty")
