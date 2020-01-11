@@ -42,15 +42,20 @@ def client_1():
                 packet_received = DHCP_PACKET(data)
                 if packet_received.message_type == DHCP_Message_Type.DHCP_OFFER:
                     log.info("Offer received")
+                    print(packet_received)
+
+                    log.info("Send REQUEST")
                     packet_received.message_type = DHCP_Message_Type.DHCP_REQUEST
                     packet_received.opcode = DHCP_Opcode.REQUEST
-
+                    print(packet_received)
                     sock.sendto(packet_received.encode(), dst)
                 elif packet_received.message_type == DHCP_Message_Type.DHCP_ACK:
                     log.info("Acknowledge received")
+                    print(packet_received)
+
                 elif packet_received.message_type == DHCP_Message_Type.DHCP_NAK:
                     log.info("Negative Acknowledge received")
-                print(packet_received)
+                    print(packet_received)
     except socket.timeout as e:
         print("Timpul de asteptare a expirat.")
         sock.close()
@@ -92,11 +97,13 @@ def client_2():
                 packet_received = DHCP_PACKET(data)
                 if packet_received.message_type == DHCP_Message_Type.DHCP_OFFER:
                     log.info("Offer received")
+                    print(packet_received)
                 elif packet_received.message_type == DHCP_Message_Type.DHCP_ACK:
                     log.info("Acknowledge received")
+                    print(packet_received)
                 elif packet_received.message_type == DHCP_Message_Type.DHCP_NAK:
                     log.info("Negative Acknowledge received")
-                print(packet_received)
+                    print(packet_received)
     except socket.timeout as e:
         print("Timpul de asteptare a expirat.")
         sock.close()
@@ -114,7 +121,7 @@ def client_3():
     packet = DHCP_PACKET(None)
     packet.opcode = DHCP_Opcode.REQUEST
     packet.message_type = DHCP_Message_Type.DHCP_DISCOVER
-    packet.request_options = [DHCP_Options.OP_DNS, DHCP_Options.OP_BROADCAST_ADDRESS, DHCP_Options.OP_BROADCAST_ADDRESS, DHCP_Options.OP_DNS, DHCP_Options.OP_SUBNETMASK]
+    packet.set_requested_options([DHCP_Options.OP_DNS, DHCP_Options.OP_BROADCAST_ADDRESS, DHCP_Options.OP_ROUTER, DHCP_Options.OP_SUBNETMASK])
     packet.client_hardware_address = '10:20:30:40:50:60'
 
     print(packet)
@@ -135,15 +142,20 @@ def client_3():
                 packet_received = DHCP_PACKET(data)
                 if packet_received.message_type == DHCP_Message_Type.DHCP_OFFER:
                     log.info("Offer received")
+                    print(packet_received)
+
+                    log.info("Send REQUEST")
                     packet_received.message_type = DHCP_Message_Type.DHCP_REQUEST
                     packet_received.opcode = DHCP_Opcode.REQUEST
-
+                    packet_received.set_requested_options([DHCP_Options.OP_REQUESTED_IP])
+                    print(packet_received)
                     sock.sendto(packet_received.encode(), dst)
                 elif packet_received.message_type == DHCP_Message_Type.DHCP_ACK:
                     log.info("Acknowledge received")
+                    print(packet_received)
                 elif packet_received.message_type == DHCP_Message_Type.DHCP_NAK:
                     log.info("Negative Acknowledge received")
-                print(packet_received)
+                    print(packet_received)
     except socket.timeout as e:
         print("Timpul de asteptare a expirat.")
         sock.close()

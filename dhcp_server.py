@@ -158,7 +158,7 @@ class DHCP_Server:
             self.debug_packet(dhcp_packet)
 
             self._add_packet_options(dhcp_packet)
-            ip_address_to_check = dhcp_packet.your_ip_address
+            ip_address_to_check = dhcp_packet.your_ip_address if dhcp_packet.your_ip_address != '0.0.0.0' else dhcp_packet.client_ip_address
             if ip_address_to_check not in self.address_pool.keys():
                 self.debug("{} is not in my pool".format(ip_address_to_check), afterEndLine=True)
                 self._send_nacknowledge(dhcp_packet)

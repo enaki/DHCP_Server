@@ -31,18 +31,25 @@ def test_Packet():
     packet = DHCP_PACKET(None, lease_time=600)
     packet.opcode = DHCP_Opcode.REQUEST
     packet.message_type = DHCP_Message_Type.DHCP_ACK
-    packet.dns = 'host.ro'
-    packet.router = '127.0.0.1'
-    packet.server_name = 'Greg'
-    packet.broadcast_address = '10.0.1.255'
-    req_list = [DHCP_Options.OP_ROUTER, DHCP_Options.OP_SERVER_NAME, DHCP_Options.OP_BROADCAST_ADDRESS]
-    packet.request_options = req_list
-    packet.server_mode = True
+
+    req_list = [DHCP_Options.OP_ROUTER, DHCP_Options.OP_SERVER_NAME,  DHCP_Options.OP_BROADCAST_ADDRESS,
+                DHCP_Options.OP_DNS, DHCP_Options.OP_REQUESTED_IP, DHCP_Options.OP_SUBNETMASK]
+    packet._request_options = req_list
     print(packet)
     data = packet.encode()
 
-    new_packet = DHCP_PACKET(data)
-    print(new_packet)
+    server_packet = DHCP_PACKET(data)
+    server_packet.dns = 'host.ro'
+    server_packet.router = '127.0.0.1'
+    server_packet.server_name = 'Greg'
+    server_packet.broadcast_address = '10.0.1.255'
+    server_packet.server_mode = True
+    server_packet.your_ip_address = '1.1.1.1'
+    server_packet.subnet_mask = '4.4.4.4'
+    print(server_packet)
+
+    data_2 = server_packet.encode()
+    print(DHCP_PACKET(data_2))
 
 
 def main():
