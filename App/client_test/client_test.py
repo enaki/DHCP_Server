@@ -1,5 +1,13 @@
 import select
 import socket
+import sys
+import os
+
+
+scriptpath = "../"
+
+# Add the directory containing your module to the Python path (wants absolute paths)
+sys.path.append(os.path.abspath(scriptpath))
 
 from dhcp_packet import DHCP_PACKET, DHCP_Message_Type, DHCP_Opcode, DHCP_Options
 from dhcp_server import log
