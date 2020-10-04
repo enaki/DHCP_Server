@@ -77,7 +77,7 @@ DHCP were treated in the application.
 The **DHCP_Server** class is the one that implements the functionality of the DHCP server.
 The implementation of the FSM (Finite State Machine) is performed in the *_analyze_data* method in which, at a
 received package the followings are checked:
-* if the ip address is in the server's address pool and is free
+* if the ip address is in the server's address pool and is free.
 * whether or not the client's MAC address has an IP address.
 * if the server still has free addresses available, etc.
 
